@@ -1,0 +1,53 @@
+use crate::Expr;
+
+grammar;
+
+match {
+    r"\s*" => { },
+    _
+}
+
+pub Expr: Expr = {
+    Lambda,
+};
+
+Lambda: Expr = {
+    r"[\\]" <var:Ident> "=>" <body:Lambda> => Expr::Lambda(var, Box::new(body)),
+    "let" <var:Ident> "=" <value:Lambda> "in" <body:Lambda> => 
+        Expr::Let(var, Box::new(value), Box::new(body)),
+    "if" <cond:Unary> "then" <then_:Lambda> "else" <else_:Lambda> => 
+        Expr::If(Box::new(cond), Box::new(then_), Box::new(else_)),
+    Unary,
+};
+
+Unary: Expr = {
+    "fst" <e:Unary> => Expr::PairFst(Box::new(e)),
+    "snd" <e:Unary> => Expr::PairSnd(Box::new(e)),
+    "zero?" <e:Unary> => Expr::IsZero(Box::new(e)),
+    "succ" <e:Unary> => Expr::Succ(Box::new(e)),
+    Application,
+};
+
+Application: Expr = {
+    <f:Application> <arg:Atom> => Expr::App(Box::new(f), Box::new(arg)),
+    Atom,
+};
+
+
+Atom: Expr = {
+    <n:Num> => Expr::Nat(n),
+    "true" => Expr::Bool(true),
+    "false" => Expr::Bool(false),
+    <id:Ident> => Expr::Var(id),
+    "(" <fst:Expr> "," <snd:Expr> ")" => Expr::Pair(Box::new(fst), Box::new(snd)),
+    "(" <e:Expr> ")" => e,
+};
+
+Num: usize = <s:r"[0-9]+"> => s.parse().unwrap();
+Ident: String = <s:r"[a-zA-Z_][a-zA-Z0-9_?!@#$%^]*"> => {
+    if s == "true" || s == "false" || s == "if" || s == "then" || s == "else" || s == "fst" || s == "snd" || s == "zero?" {
+        panic!("Reserved keyword: {}", s)
+    } else {
+        s.to_string()
+    }
+};
